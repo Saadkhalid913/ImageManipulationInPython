@@ -43,12 +43,86 @@ def UseFillMatrices(img, rValue=1, gValue=1, bValue=1, MatrixSize=10):
     return img
 
 
+def GreyScale(img):
+    # converts an np image to greyscale
+    rows = img.shape[0]
+    cols = img.shape[1]
+
+    TargetImg = np.zeros((rows, cols))
+
+    for i in range(rows):
+        for j in range(cols):
+            R = img[i][j][0]
+            G = img[i][j][1]
+            B = img[i][j][2]
+
+            TargetImg[i][j] = 0.299*R + 0.587 * G + 0.114*B
+
+    TargetImg = np.expand_dims(TargetImg, axis=2)
+
+    return np.concatenate((TargetImg, TargetImg, TargetImg), axis=2)
+
+
+def Convolution(img: np.array, matrix: np.array, layer: int):
+    # applys some matrix convolution to a given image layer and returns result
+    n = len(matrix)
+    rows = img.shape[0]
+    cols = img.shape[1]
+
+    AdjusmentRows = rows % n
+    AdjusmentCols = cols % n
+
+    img = img[:, :, [layer]]
+    img = np.squeeze(img, axis=2)  # removing 2nd dim of length 1
+
+    targetImage = np.zeros(img.shape)
+
+    for i in range(len(img) - n):
+        for j in range(len(img[0]) - n):
+            ElementProduct = np.multiply(img[i: i + n, j: j + n],  matrix)
+            WeightedSum = np.sum(ElementProduct) / n**2
+            targetImage[i][j] = WeightedSum
+
+    return np.expand_dims(targetImage, axis=2)
+
+
+def compress(img: np.array, factor: int, layer: int):
+    # compresses given layer of an image by some factor
+    img = np.squeeze(img[:, :, [layer]], axis=2)
+
+    rows = img.shape[0]
+    cols = img.shape[1]
+
+    target = np.zeros((rows // factor, cols // factor))
+
+    for i in range(0, rows - factor, factor):
+        for j in range(0, cols - factor, factor):
+            WeightedAverage = np.sum(
+                img[i: i + factor, j: j + factor]) / (factor ** 2)
+            target[i // factor][j // factor] = WeightedAverage
+
+    return np.expand_dims(target, axis=2)
+
+
+def CompressImage(img: np.array, factor: int):
+    # compresses image by some factor
+    # rType: np.array
+    imgR = compress(img, factor, 0)
+    imgG = compress(img, factor, 1)
+    imgB = compress(img, factor, 2)
+    img = np.concatenate((imgR, imgG, imgB), axis=2)
+    print(img.shape)
+
+    return img
+
+
 def SaveImgFromArray(img):
+    # takes an image object and saves it to images folder with random hash as name
     im = Image.fromarray(img.astype("uint8"))
     im.save("images/" + "%x" % random.getrandbits(128) + ".jpeg")
 
 
-img = Image.open("1b58ef6e3d36a42e01992accf5c52d6eea244353.jpg")
+img = Image.open("sample_5184×3456.bmp")
 img = np.array(img)
-img = UseFillMatrices(img, 1, 0.5, 5, 10)
+img = CompressImage(img, 64)
 SaveImgFromArray(img)
